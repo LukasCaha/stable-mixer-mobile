@@ -7,9 +7,11 @@ use App\Models\Setting;
 use App\Services\AnswerSync;
 use App\Services\MemoSync;
 use App\Services\RecordingStore;
+use App\Services\RecordSync;
 use App\Services\StableLookup;
 use App\Support\M4aDuration;
 use App\Support\TenantCode;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -19,6 +21,7 @@ use Native\Mobile\Edge\NativeComponent;
 use Native\Mobile\Events\Microphone\MicrophoneCancelled;
 use Native\Mobile\Events\Microphone\MicrophoneRecorded;
 use Native\Mobile\Events\Scanner\CodeScanned;
+use Native\Mobile\Events\System\AppearanceChanged;
 use Native\Mobile\Facades\Microphone;
 use Native\Mobile\Facades\Scanner;
 use StableMixer\Speech\Speech;
@@ -36,6 +39,10 @@ class Recorder extends NativeComponent
     public string $phase = 'idle';
 
     public string $tab = 'record';
+
+    public string $uiLanguage = 'en';
+
+    public bool $dark = false;
 
     public bool $serverPending = false;
 
@@ -57,12 +64,18 @@ class Recorder extends NativeComponent
     /** @var list<array{id: string, question: string, answer: string, when: string}> */
     public array $answers = [];
 
+    /** @var list<array{id: string, name: string, kind: string, knowledge: string, events: list<array{when: string, summary: string, detail: string}>}> */
+    public array $records = [];
+
     private ?float $segmentStartedAt = null;
 
     private int $accumulatedSeconds = 0;
 
     public function mount(): void
     {
+        $this->uiLanguage = Setting::uiLanguage();
+        App::setLocale($this->uiLanguage);
+        $this->dark = isDark();
         $this->tenantCode = Setting::tenant();
         $this->stableName = Setting::stableName();
         $status = Microphone::getStatus();
@@ -83,7 +96,7 @@ class Recorder extends NativeComponent
     {
         Scanner::scan()
             ->id('tenant')
-            ->prompt('Scan your 8-character tenant code')
+            ->prompt(__('ui.scan_prompt'))
             ->formats(['qr'])
             ->scan();
     }
@@ -98,7 +111,7 @@ class Recorder extends NativeComponent
         $code = TenantCode::fromScan($this->typedCode);
 
         if ($code === null) {
-            $this->notice = 'Enter exactly 8 letters or numbers.';
+            $this->notice = __('ui.notice_code_length');
 
             return;
         }
@@ -109,7 +122,7 @@ class Recorder extends NativeComponent
     public function beginReplaceTenant(): void
     {
         if ($this->phase !== 'idle' || $this->saving) {
-            $this->notice = 'Stop the recording before changing the tenant code.';
+            $this->notice = __('ui.notice_stop_first');
 
             return;
         }
@@ -124,6 +137,27 @@ class Recorder extends NativeComponent
         $this->replacingTenant = false;
         $this->typedCode = '';
         $this->notice = null;
+    }
+
+    public function switchUiLanguage(string $language): void
+    {
+        $language = $language === 'cs' ? 'cs' : 'en';
+        Setting::putUiLanguage($language);
+        $this->uiLanguage = $language;
+        App::setLocale($language);
+    }
+
+    #[On(AppearanceChanged::class)]
+    public function onAppearance(string $mode): void
+    {
+        $this->dark = $mode === 'dark';
+    }
+
+    public function showStable(): void
+    {
+        $this->tab = 'stable';
+        $this->stopSpeaking();
+        $this->refreshRecords();
     }
 
     public function showRecord(): void
@@ -202,7 +236,7 @@ class Recorder extends NativeComponent
         Microphone::stop();
         $this->phase = 'idle';
         $this->saving = true;
-        $this->notice = 'Saving recording…';
+        $this->notice = __('ui.notice_saving');
     }
 
     public function deleteRecording(string $id): void
@@ -257,7 +291,7 @@ class Recorder extends NativeComponent
         $code = TenantCode::fromScan($data);
 
         if ($code === null) {
-            $this->notice = 'That QR code is not an 8-character tenant code.';
+            $this->notice = __('ui.notice_bad_qr');
 
             return;
         }
@@ -284,7 +318,7 @@ class Recorder extends NativeComponent
             $this->saving = false;
             $this->activeId = null;
             $this->phase = 'idle';
-            $this->notice = 'The recording could not be saved.';
+            $this->notice = __('ui.notice_save_failed');
             $this->refreshQueue();
 
             return;
@@ -293,7 +327,7 @@ class Recorder extends NativeComponent
         $this->saving = false;
         $this->activeId = null;
         $this->phase = 'idle';
-        $this->notice = 'Saved on this phone. Waiting to sync.';
+        $this->notice = __('ui.notice_saved');
         $this->refreshQueue();
         app(MemoSync::class)->pushDue();
         $this->refreshQueue();
@@ -306,7 +340,7 @@ class Recorder extends NativeComponent
         $this->saving = false;
         $this->activeId = null;
         $this->phase = 'idle';
-        $this->notice = 'Recording was cancelled.';
+        $this->notice = __('ui.notice_cancelled');
     }
 
     #[Poll(15000)]
@@ -319,15 +353,41 @@ class Recorder extends NativeComponent
         app(MemoSync::class)->pushDue();
         $this->refreshQueue();
         $this->refreshAnswers();
+        if ($this->tab === 'stable') {
+            $this->refreshRecords();
+        }
+    }
+
+    public function phaseLabel(): string
+    {
+        return match ($this->phase) {
+            'recording' => __('ui.listening'),
+            'paused' => __('ui.paused'),
+            default => __('ui.ready'),
+        };
     }
 
     public function recordLabel(): string
     {
         return match ($this->phase) {
-            'recording' => 'Pause',
-            'paused' => 'Resume',
-            default => $this->tab === 'ask' ? 'Ask' : 'Record',
+            'recording' => __('ui.pause'),
+            'paused' => __('ui.resume'),
+            default => $this->tab === 'ask' ? __('ui.ask') : __('ui.record'),
         };
+    }
+
+    public function headerMarkTint(): ?string
+    {
+        return $this->dark ? '#F6F3EC' : null;
+    }
+
+    public function dockMarkTint(): ?string
+    {
+        if ($this->tab === 'stable') {
+            return $this->dark ? '#1C1B18' : '#F6F3EC';
+        }
+
+        return $this->dark ? '#F6F3EC' : null;
     }
 
     public function scannerAvailable(): bool
@@ -341,7 +401,7 @@ class Recorder extends NativeComponent
 
         if ($status === 'recording' || $status === 'paused') {
             $this->phase = $status;
-            $this->notice = 'A recording is already in progress.';
+            $this->notice = __('ui.notice_in_progress');
 
             return;
         }
@@ -355,7 +415,7 @@ class Recorder extends NativeComponent
 
         if (! $started) {
             $this->segmentStartedAt = null;
-            $this->notice = 'Microphone did not start. Allow microphone access and try again.';
+            $this->notice = __('ui.notice_mic');
 
             return;
         }
@@ -370,13 +430,13 @@ class Recorder extends NativeComponent
         $result = app(StableLookup::class)->find($code);
 
         if ($result['status'] === StableLookup::Unreachable) {
-            $this->notice = 'Could not reach the server.';
+            $this->notice = __('ui.notice_unreachable');
 
             return;
         }
 
         if ($result['status'] !== StableLookup::Found || $result['name'] === null) {
-            $this->notice = 'That code is not recognized.';
+            $this->notice = __('ui.notice_unknown_code');
 
             return;
         }
@@ -433,6 +493,16 @@ class Recorder extends NativeComponent
         if ($this->speakingId !== null && collect($this->answers)->doesntContain(fn (array $row): bool => $row['id'] === $this->speakingId)) {
             $this->speakingId = null;
         }
+    }
+
+    private function refreshRecords(): void
+    {
+        $pulled = app(RecordSync::class)->pull();
+        if ($pulled === null) {
+            return;
+        }
+
+        $this->records = $pulled;
     }
 
     private function stopSpeaking(): void

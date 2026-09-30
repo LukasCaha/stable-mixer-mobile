@@ -47,4 +47,19 @@ class Setting extends Model
             ['value' => $name],
         );
     }
+
+    public static function uiLanguage(): string
+    {
+        $value = static::query()->where('key', 'ui_language')->value('value');
+
+        return $value === 'cs' ? 'cs' : 'en';
+    }
+
+    public static function putUiLanguage(string $language): void
+    {
+        static::query()->updateOrCreate(
+            ['key' => 'ui_language'],
+            ['value' => $language === 'cs' ? 'cs' : 'en'],
+        );
+    }
 }

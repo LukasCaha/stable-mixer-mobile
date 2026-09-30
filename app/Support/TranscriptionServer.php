@@ -34,4 +34,11 @@ class TranscriptionServer
 
         return $base === null ? null : $base.'/api/v1/answers';
     }
+
+    public static function recordsUrl(): ?string
+    {
+        $base = self::baseUrl();
+
+        return $base === null ? null : $base.'/api/v1/records';
+    }
 }

@@ -46,10 +46,10 @@ class Recording extends Model
     public function label(): string
     {
         return match ($this->status) {
-            self::Uploading => 'Uploading',
-            self::Synced => 'Synced',
-            self::Failed => 'Failed, will retry',
-            default => 'Pending sync',
+            self::Uploading => __('ui.status_uploading'),
+            self::Synced => __('ui.status_synced'),
+            self::Failed => __('ui.status_failed'),
+            default => __('ui.status_pending'),
         };
     }
 

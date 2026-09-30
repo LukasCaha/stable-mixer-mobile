@@ -287,6 +287,48 @@ class RecorderScreenTest extends TestCase
             ->assertDontSee('Nothing answered yet.');
     }
 
+    public function test_the_phone_language_is_separate_from_the_stable(): void
+    {
+        Native::test(Recorder::class)
+            ->tap('lang-cs')
+            ->assertSee('Spáruj telefon')
+            ->assertSet('uiLanguage', 'cs');
+
+        $this->assertSame('cs', Setting::uiLanguage());
+    }
+
+    public function test_the_stable_tab_lists_records(): void
+    {
+        Setting::putStable('ABCD1234', 'North Barn');
+
+        Http::fake([
+            'https://stable.test/api/v1/records' => Http::response([
+                'records' => [[
+                    'id' => 7,
+                    'name' => 'Willow',
+                    'kind' => 'animal',
+                    'knowledge' => 'Grey mare.',
+                    'events' => [[
+                        'occurred_on' => '2026-09-30',
+                        'summary' => 'Shod',
+                        'detail' => 'Front feet.',
+                    ]],
+                ]],
+            ]),
+        ]);
+
+        Native::test(Recorder::class)
+            ->assertSee('Stable')
+            ->assertSee('Record')
+            ->assertSee('Ask')
+            ->tap('Stable')
+            ->assertSet('tab', 'stable')
+            ->assertSee('Willow')
+            ->assertSee('Grey mare.')
+            ->assertSee('Shod')
+            ->assertSee('Animal');
+    }
+
     private function fakeStableLookup(): void
     {
         Http::fake(function ($request) {
