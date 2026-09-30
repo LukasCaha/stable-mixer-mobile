@@ -6,6 +6,7 @@ use App\Models\Recording;
 use App\Models\Setting;
 use App\Services\MemoSync;
 use App\Services\RecordingStore;
+use App\Services\StableLookup;
 use App\Support\M4aDuration;
 use App\Support\TenantCode;
 use Illuminate\Support\Facades\Log;
@@ -23,6 +24,8 @@ use Native\Mobile\Facades\Scanner;
 class Recorder extends NativeComponent
 {
     public ?string $tenantCode = null;
+
+    public ?string $stableName = null;
 
     public string $typedCode = '';
 
@@ -50,6 +53,7 @@ class Recorder extends NativeComponent
     public function mount(): void
     {
         $this->tenantCode = Setting::tenant();
+        $this->stableName = Setting::stableName();
         $status = Microphone::getStatus();
 
         if (in_array($status, ['recording', 'paused'], true)) {
@@ -309,8 +313,23 @@ class Recorder extends NativeComponent
 
     private function storeTenant(string $code): void
     {
-        Setting::putTenant($code);
-        $this->tenantCode = $code;
+        $result = app(StableLookup::class)->find($code);
+
+        if ($result['status'] === StableLookup::Unreachable) {
+            $this->notice = 'Could not reach the server.';
+
+            return;
+        }
+
+        if ($result['status'] !== StableLookup::Found || $result['name'] === null) {
+            $this->notice = 'That code is not recognized.';
+
+            return;
+        }
+
+        Setting::putStable($result['code'], $result['name']);
+        $this->tenantCode = $result['code'];
+        $this->stableName = $result['name'];
         $this->typedCode = '';
         $this->replacingTenant = false;
         $this->notice = null;

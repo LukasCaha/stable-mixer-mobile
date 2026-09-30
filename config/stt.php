@@ -8,15 +8,16 @@ return [
     |--------------------------------------------------------------------------
     |
     | The companion does not transcribe audio on the phone. When a recording
-    | stops it is stored locally and this URL receives multipart field "file"
-    | with header X-Tenant. Leave the URL empty until the server exists; the
-    | memo stays on disk as pending sync.
+    | stops it is stored locally and the server receives multipart field "file"
+    | with header X-Tenant. Without a base URL the memo stays on disk.
     |
-    | Point this at the computer running the API. An emulator reaches the
-    | host machine at http://10.0.2.2:<port>. A phone on the same Wi-Fi
-    | needs the computer's LAN address.
+    | STT_BASE_URL is the Stable Mixer site. Uploads go to
+    | {base}/api/v1/memos. Set STT_UPLOAD_URL only to override that full
+    | upload address, for example an emulator talking to a local server.
     |
     */
+
+    'base_url' => env('STT_BASE_URL', 'https://stable.on-forge.com'),
 
     'url' => env('STT_UPLOAD_URL'),
 

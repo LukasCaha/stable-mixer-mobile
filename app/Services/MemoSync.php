@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Recording;
 use App\Models\Setting;
+use App\Support\TranscriptionServer;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -16,8 +17,8 @@ class MemoSync
             return;
         }
 
-        $url = config('stt.url');
-        if (! is_string($url) || $url === '') {
+        $url = TranscriptionServer::uploadUrl();
+        if ($url === null) {
             return;
         }
 

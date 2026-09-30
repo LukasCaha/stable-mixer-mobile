@@ -6,6 +6,8 @@ use App\Models\Recording;
 use App\Models\Setting;
 use App\NativeComponents\Recorder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Native\Mobile\Events\Microphone\MicrophoneRecorded;
 use Native\Mobile\Events\Scanner\CodeScanned;
@@ -20,6 +22,12 @@ class RecorderScreenTest extends TestCase
     {
         parent::setUp();
 
+        config([
+            'stt.base_url' => 'https://stable.test',
+            'stt.url' => null,
+            'stt.wifi_only' => true,
+        ]);
+
         Native::fakeBridge()
             ->respondTo('Microphone.GetStatus', ['status' => 'idle'])
             ->respondTo('Microphone.Start', []);
@@ -27,6 +35,8 @@ class RecorderScreenTest extends TestCase
 
     public function test_a_typed_code_unlocks_the_record_button(): void
     {
+        $this->fakeStableLookup();
+
         Native::test(Recorder::class)
             ->assertSee('Scan QR code')
             ->set('typedCode', 'abcd123')
@@ -35,25 +45,33 @@ class RecorderScreenTest extends TestCase
             ->set('typedCode', 'ABCD1234')
             ->tap('Save code')
             ->assertSee('Record')
+            ->assertSee('North Barn')
             ->assertSee('ABCD1234')
             ->assertDontSee('Scan QR code');
 
         $this->assertSame('ABCD1234', Setting::tenant());
+        $this->assertSame('North Barn', Setting::stableName());
     }
 
     public function test_the_demo_code_unlocks_recording(): void
     {
+        $this->fakeStableLookup();
+
         Native::test(Recorder::class)
             ->tap('Use demo code')
             ->assertSee('DEMO1234')
+            ->assertSee('North Barn')
             ->assertSee('Record')
             ->assertDontSee('Use demo code');
 
         $this->assertSame('DEMO1234', Setting::tenant());
+        $this->assertSame('North Barn', Setting::stableName());
     }
 
     public function test_record_pause_resume_stop_stores_a_pending_memo(): void
     {
+        $this->fakeStableLookup();
+
         $screen = Native::test(Recorder::class)
             ->set('typedCode', 'ABCD1234')
             ->tap('Save code')
@@ -100,6 +118,8 @@ class RecorderScreenTest extends TestCase
 
     public function test_scanning_a_valid_qr_stores_the_tenant(): void
     {
+        $this->fakeStableLookup();
+
         Native::test(Recorder::class)
             ->tap('Scan QR code');
 
@@ -114,9 +134,11 @@ class RecorderScreenTest extends TestCase
                 'id' => 'tenant',
             ])
             ->assertSee('ZXCV9876')
+            ->assertSee('North Barn')
             ->assertSee('Record');
 
         $this->assertSame('ZXCV9876', Setting::tenant());
+        $this->assertSame('North Barn', Setting::stableName());
     }
 
     public function test_a_saved_memo_shows_its_length_and_can_be_deleted(): void
@@ -149,5 +171,55 @@ class RecorderScreenTest extends TestCase
 
         $this->assertNull(Recording::query()->find($recording->id));
         Storage::disk('local')->assertMissing($recording->path);
+    }
+
+    public function test_an_unknown_code_does_not_replace_the_connected_stable(): void
+    {
+        Setting::putStable('ZXCV9876', 'Old Barn');
+
+        Http::fake([
+            'https://stable.test/api/v1/stables/ABCD1234' => Http::response(['message' => 'Stable not found.'], 404),
+        ]);
+
+        Native::test(Recorder::class)
+            ->tap('Change')
+            ->set('typedCode', 'ABCD1234')
+            ->tap('Save code')
+            ->assertSee('That code is not recognized.')
+            ->assertDontSee('Record');
+
+        $this->assertSame('ZXCV9876', Setting::tenant());
+        $this->assertSame('Old Barn', Setting::stableName());
+    }
+
+    public function test_an_unreachable_server_keeps_the_previous_stable(): void
+    {
+        Setting::putStable('ZXCV9876', 'Old Barn');
+
+        Http::fake(function () {
+            throw new ConnectionException('down');
+        });
+
+        Native::test(Recorder::class)
+            ->tap('Change')
+            ->set('typedCode', 'ABCD1234')
+            ->tap('Save code')
+            ->assertSee('Could not reach the server.');
+
+        $this->assertSame('ZXCV9876', Setting::tenant());
+        $this->assertSame('Old Barn', Setting::stableName());
+    }
+
+    private function fakeStableLookup(): void
+    {
+        Http::fake(function ($request) {
+            $path = parse_url($request->url(), PHP_URL_PATH);
+            $code = strtoupper(basename(is_string($path) ? $path : ''));
+
+            return Http::response([
+                'name' => 'North Barn',
+                'tenant_code' => $code,
+            ]);
+        });
     }
 }

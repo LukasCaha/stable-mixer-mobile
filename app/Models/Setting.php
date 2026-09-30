@@ -31,4 +31,20 @@ class Setting extends Model
             ['value' => $code],
         );
     }
+
+    public static function stableName(): ?string
+    {
+        $value = static::query()->where('key', 'stable_name')->value('value');
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    public static function putStable(string $code, string $name): void
+    {
+        static::putTenant($code);
+        static::query()->updateOrCreate(
+            ['key' => 'stable_name'],
+            ['value' => $name],
+        );
+    }
 }

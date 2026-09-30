@@ -32,6 +32,7 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="STT_BASE_URL" value="https://stable.test"/>
         <env name="STT_UPLOAD_URL" value=""/>
         <env name="STT_WIFI_ONLY" value="false"/>
     </php>

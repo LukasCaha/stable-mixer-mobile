@@ -2,7 +2,7 @@
     @if ($tenantCode === null || $replacingTenant)
         <native:text class="text-slate-900 text-3xl font-bold">Stable Mixer</native:text>
         <native:text class="text-slate-700">
-            Use the demo code to try recording, scan a tenant QR code, or type 8 letters or numbers.
+            Scan the stable QR code or type the 8-character pairing code. The phone checks it with the server before you can record.
         </native:text>
 
         @if ($notice)
@@ -38,7 +38,7 @@
     @else
         <native:row class="w-full items-center justify-between">
             <native:column>
-                <native:text class="text-slate-900 text-2xl font-bold">Stable Mixer</native:text>
+                <native:text class="text-slate-900 text-2xl font-bold">{{ $stableName ?: 'Stable Mixer' }}</native:text>
                 <native:text class="text-slate-700">{{ $tenantCode }}</native:text>
             </native:column>
             <native:pressable ref="change-tenant" @tap="beginReplaceTenant" class="px-3 py-2">

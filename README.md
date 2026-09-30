@@ -4,7 +4,7 @@ Android app for recording a voice memo and queueing it for the transcription ser
 
 One screen:
 
-- First launch asks for an 8-character tenant code (`A–Z`, `a–z`, `0–9`). Scan it when the paid QR plugin is installed, or type it.
+- First launch asks for an 8-character pairing code (`A–Z`, `a–z`, `0–9`). Scan it when the paid QR plugin is installed, or type it. The phone checks the code with the server and shows the stable name when it connects.
 - The red button records, pauses, and resumes. Stop writes an `.m4a` on the phone and shows it as pending sync.
 - While the app is open it retries the upload with backoff. The pending count is the memos that are not synced yet.
 
@@ -34,19 +34,17 @@ adb install -r dist/stable-mixer-*.apk
 
 If Android says the signatures do not match, uninstall the old debug build first. `native:install` runs automatically when `nativephp/android` is missing.
 
-Leave `STT_UPLOAD_URL` empty until the server exists. Recordings still save on the phone and stay at "pending sync".
+The app talks to `https://stable.on-forge.com` unless you set `STT_BASE_URL`. Pairing calls `GET {STT_BASE_URL}/api/v1/stables/{code}`. Uploads go to `POST {STT_BASE_URL}/api/v1/memos` with header `X-Tenant` and multipart field `file` (`audio/m4a`). A success body is `{ "id": "...", "status": "queued" }`.
 
-When the server is up, set the URL to a machine the phone can reach and rebuild:
+Set `STT_UPLOAD_URL` only when the upload address is not that default path. Rebuild after changing either value:
 
 ```bash
 # emulator talks to your computer as 10.0.2.2
-STT_UPLOAD_URL=http://10.0.2.2:8000/v1/memos
+STT_BASE_URL=http://10.0.2.2:8000
 
 # a real phone on the same Wi-Fi uses your computer's LAN address
-STT_UPLOAD_URL=http://192.168.1.20:8000/v1/memos
+STT_BASE_URL=http://192.168.1.20:8000
 ```
-
-`POST /v1/memos` with header `X-Tenant: ABCD1234` and multipart field `file` (`audio/m4a`). A success body is `{ "id": "...", "status": "queued" }`.
 
 ## QR scanner plugin
 
@@ -59,7 +57,7 @@ composer require nativephp/mobile-scanner
 php artisan native:plugin:register nativephp/mobile-scanner
 ```
 
-Then run `php artisan native:run android --build=debug` again so the camera scanner is compiled in. Until then, type the 8-character code. The app accepts a bare code, `tenant:ABCD1234`, `?tenant=ABCD1234`, or a URL whose last path segment is the code.
+Then run `php artisan native:run android --build=debug` again so the camera scanner is compiled in. Until then, type the 8-character code. The app accepts a bare code, `tenant:ABCD1234`, `?tenant=ABCD1234`, or a URL whose last path segment is the code. The demo button uses `DEMO1234` and only connects when that stable exists on the server.
 
 ## Tests
 
