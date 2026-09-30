@@ -328,9 +328,9 @@ return [
         |
         */
         'theme' => [
-            'color_primary' => env('NATIVEPHP_ANDROID_COLOR_PRIMARY', '#04ABA6'),
-            'color_primary_night' => env('NATIVEPHP_ANDROID_COLOR_PRIMARY_NIGHT', '#FFFFFF'),
-            'color_on_primary' => env('NATIVEPHP_ANDROID_COLOR_ON_PRIMARY', '#FFFFFF'),
+            'color_primary' => env('NATIVEPHP_ANDROID_COLOR_PRIMARY', '#3E4C3C'),
+            'color_primary_night' => env('NATIVEPHP_ANDROID_COLOR_PRIMARY_NIGHT', '#C5D0BC'),
+            'color_on_primary' => env('NATIVEPHP_ANDROID_COLOR_ON_PRIMARY', '#F6F3EC'),
         ],
 
         /*

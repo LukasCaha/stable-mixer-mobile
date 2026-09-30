@@ -45,6 +45,27 @@ class BuildApkCommand extends Command
         }
     }
 
+    /**
+     * Adaptive icons sit on this drawable. Cream matches public/icon.png so the
+     * scaled foreground does not show a white tile around the horse.
+     */
+    protected function paintLauncherBackground(): void
+    {
+        $path = base_path('nativephp/android/app/src/main/res/drawable/ic_launcher_background.xml');
+
+        if (! File::isDirectory(dirname($path))) {
+            return;
+        }
+
+        File::put($path, <<<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+       android:shape="rectangle">
+    <solid android:color="#F6F3EC"/>
+</shape>
+XML);
+    }
+
     protected function buildArtifact(): int
     {
         $type = strtolower((string) $this->argument('type'));
@@ -131,6 +152,7 @@ class BuildApkCommand extends Command
         }
 
         $this->prepareAndroidBuild(cleanCache: false, excludeDevDependencies: false);
+        $this->paintLauncherBackground();
 
         if (! $this->compileAndroidPlugins()) {
             return self::FAILURE;
@@ -203,6 +225,7 @@ class BuildApkCommand extends Command
         $this->androidLogPath = base_path($this->androidLogPath);
         File::ensureDirectoryExists(dirname($this->androidLogPath));
         $this->prepareAndroidBuild(cleanCache: false);
+        $this->paintLauncherBackground();
 
         $exitCode = $this->withAsyncXdgOpen(fn () => $this->call('native:package', [
             'platform' => 'android',
