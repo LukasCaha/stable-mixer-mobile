@@ -6,6 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Native\Mobile\Providers\MicrophoneServiceProvider;
 use Native\Mobile\Providers\ScannerServiceProvider;
 use Native\Mobile\UI\NativeUIServiceProvider;
+use StableMixer\Speech\SpeechServiceProvider;
 
 class NativeServiceProvider extends ServiceProvider
 {
@@ -42,7 +43,7 @@ class NativeServiceProvider extends ServiceProvider
             // After `composer require nativephp/mobile-scanner`:
             // php artisan native:plugin:register nativephp/mobile-scanner
             ScannerServiceProvider::class,
-
+            SpeechServiceProvider::class,
         ];
     }
 }

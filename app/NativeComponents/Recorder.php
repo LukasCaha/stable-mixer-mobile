@@ -4,6 +4,7 @@ namespace App\NativeComponents;
 
 use App\Models\Recording;
 use App\Models\Setting;
+use App\Services\AnswerSync;
 use App\Services\MemoSync;
 use App\Services\RecordingStore;
 use App\Services\StableLookup;
@@ -20,6 +21,7 @@ use Native\Mobile\Events\Microphone\MicrophoneRecorded;
 use Native\Mobile\Events\Scanner\CodeScanned;
 use Native\Mobile\Facades\Microphone;
 use Native\Mobile\Facades\Scanner;
+use StableMixer\Speech\Speech;
 
 class Recorder extends NativeComponent
 {
@@ -33,6 +35,12 @@ class Recorder extends NativeComponent
 
     public string $phase = 'idle';
 
+    public string $tab = 'record';
+
+    public bool $serverPending = false;
+
+    public ?string $speakingId = null;
+
     public bool $saving = false;
 
     public ?string $activeId = null;
@@ -45,6 +53,9 @@ class Recorder extends NativeComponent
 
     /** @var array<int, array{id: string, label: string, when: string, duration: string, size: string, status: string}> */
     public array $recent = [];
+
+    /** @var list<array{id: string, question: string, answer: string, when: string}> */
+    public array $answers = [];
 
     private ?float $segmentStartedAt = null;
 
@@ -113,6 +124,45 @@ class Recorder extends NativeComponent
         $this->replacingTenant = false;
         $this->typedCode = '';
         $this->notice = null;
+    }
+
+    public function showRecord(): void
+    {
+        $this->tab = 'record';
+        $this->stopSpeaking();
+    }
+
+    public function showAsk(): void
+    {
+        $this->tab = 'ask';
+        $this->refreshAnswers();
+    }
+
+    public function playAnswer(string $id): void
+    {
+        if ($this->speakingId === $id) {
+            $this->stopSpeaking();
+
+            return;
+        }
+
+        $row = collect($this->answers)->firstWhere('id', $id);
+        if (! is_array($row)) {
+            return;
+        }
+
+        $text = trim((string) ($row['answer'] ?? ''));
+        if ($text === '') {
+            return;
+        }
+
+        app(Speech::class)->speak($text);
+        $this->speakingId = $id;
+    }
+
+    public function waitingForAnswer(): bool
+    {
+        return $this->pendingCount > 0 || $this->serverPending;
     }
 
     public function cycleRecording(): void
@@ -247,6 +297,7 @@ class Recorder extends NativeComponent
         $this->refreshQueue();
         app(MemoSync::class)->pushDue();
         $this->refreshQueue();
+        $this->refreshAnswers();
     }
 
     #[On(MicrophoneCancelled::class)]
@@ -267,6 +318,7 @@ class Recorder extends NativeComponent
 
         app(MemoSync::class)->pushDue();
         $this->refreshQueue();
+        $this->refreshAnswers();
     }
 
     public function recordLabel(): string
@@ -274,7 +326,7 @@ class Recorder extends NativeComponent
         return match ($this->phase) {
             'recording' => 'Pause',
             'paused' => 'Resume',
-            default => 'Record',
+            default => $this->tab === 'ask' ? 'Ask' : 'Record',
         };
     }
 
@@ -293,6 +345,8 @@ class Recorder extends NativeComponent
 
             return;
         }
+
+        $this->stopSpeaking();
 
         $id = (string) str()->uuid();
         $this->accumulatedSeconds = 0;
@@ -364,6 +418,31 @@ class Recorder extends NativeComponent
                 ];
             })
             ->all();
+    }
+
+    private function refreshAnswers(): void
+    {
+        $pulled = app(AnswerSync::class)->pull();
+        if ($pulled === null) {
+            return;
+        }
+
+        $this->serverPending = $pulled['pending'];
+        $this->answers = $pulled['answers'];
+
+        if ($this->speakingId !== null && collect($this->answers)->doesntContain(fn (array $row): bool => $row['id'] === $this->speakingId)) {
+            $this->speakingId = null;
+        }
+    }
+
+    private function stopSpeaking(): void
+    {
+        if ($this->speakingId === null) {
+            return;
+        }
+
+        app(Speech::class)->stop();
+        $this->speakingId = null;
     }
 
     private function captureElapsed(): void

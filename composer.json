@@ -12,7 +12,8 @@
         "nativephp/mobile": "^4.5",
         "nativephp/mobile-microphone": "^1.1",
         "nativephp/mobile-scanner": "^1.1",
-        "nativephp/mobile-ui": "^0.6.0"
+        "nativephp/mobile-ui": "^0.6.0",
+        "stable-mixer/speech": "1.0.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -99,9 +100,15 @@
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
-    "repositories": [{
-        "name": "nativephp-plugins",
-        "type": "composer",
-        "url": "https://plugins.nativephp.com"
-    }]
+    "repositories": [
+        {
+            "type": "path",
+            "url": "plugins/speech"
+        },
+        {
+            "name": "nativephp-plugins",
+            "type": "composer",
+            "url": "https://plugins.nativephp.com"
+        }
+    ]
 }

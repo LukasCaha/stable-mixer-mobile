@@ -1,4 +1,7 @@
-<native:column class="w-full h-full bg-theme-background safe-area-top">
+@use('App\Icons\Android')
+@use('App\Icons\Ios')
+
+<native:column class="w-full h-full bg-theme-background {{ ($tenantCode === null || $replacingTenant) ? 'safe-area-top' : '' }}">
     @if ($tenantCode === null || $replacingTenant)
         <native:scroll-view class="w-full flex-1">
             <native:column class="w-full px-6 pt-4 pb-10 gap-5">
@@ -73,7 +76,7 @@
             };
         @endphp
 
-        <native:column class="w-full flex-1 px-5 pt-3 pb-4 gap-3">
+        <native:column class="w-full flex-1 px-5 pt-3 pb-4 gap-3 safe-area-top">
             <native:row class="w-full items-center gap-3">
                 <native:image src="brand/mark.png" alt="" class="w-11 h-11" />
                 <native:column class="flex-1 gap-0.5">
@@ -85,6 +88,60 @@
                 </native:pressable>
             </native:row>
 
+            @if ($tab === 'ask')
+                <native:scroll-view class="w-full flex-1">
+                    <native:column class="w-full gap-2 pb-4">
+                        @if ($this->waitingForAnswer())
+                            <native:column class="w-full rounded-2xl bg-theme-surface px-4 py-3 border border-theme-outline">
+                                <native:text class="text-theme-on-surface">Waiting for an answer</native:text>
+                            </native:column>
+                        @endif
+
+                        @forelse ($answers as $row)
+                            <native:column native:key="answer-{{ $row['id'] }}" class="w-full gap-2 rounded-2xl bg-theme-surface px-4 py-3 border border-theme-outline">
+                                @if ($row['when'] !== '')
+                                    <native:text font="mono" class="text-xs uppercase tracking-widest text-theme-on-surface-variant">{{ $row['when'] }}</native:text>
+                                @endif
+                                <native:text font="display" class="text-lg tracking-tight text-theme-on-background">{{ $row['question'] }}</native:text>
+                                <native:text class="text-base leading-relaxed text-theme-on-surface">{{ $row['answer'] }}</native:text>
+                                <native:row>
+                                    <native:pressable @tap="playAnswer('{{ $row['id'] }}')" class="px-4 py-2 rounded-full bg-theme-primary">
+                                        <native:text font="display" class="text-theme-on-primary">{{ $speakingId === $row['id'] ? 'Stop' : 'Play' }}</native:text>
+                                    </native:pressable>
+                                </native:row>
+                            </native:column>
+                        @empty
+                            @unless ($this->waitingForAnswer())
+                                <native:column class="w-full rounded-2xl bg-theme-surface px-4 py-5 border border-theme-outline">
+                                    <native:text class="text-theme-on-surface-variant">Nothing answered yet.</native:text>
+                                </native:column>
+                            @endunless
+                        @endforelse
+                    </native:column>
+                </native:scroll-view>
+
+                <native:column class="w-full items-center gap-3 py-2">
+                    <native:text font="mono" class="text-xs uppercase tracking-widest text-theme-secondary">{{ $phaseLabel }}</native:text>
+
+                    <native:pressable
+                        ref="ask"
+                        @tap="cycleRecording"
+                        class="w-full bg-theme-primary py-4 rounded-2xl items-center shadow-sm"
+                    >
+                        <native:text font="display" class="text-theme-on-primary text-lg">{{ $this->recordLabel() }}</native:text>
+                    </native:pressable>
+
+                    @if ($phase !== 'idle')
+                        <native:pressable ref="stop" @tap="stopRecording" class="px-10 py-3 rounded-full bg-theme-surface border border-theme-outline">
+                            <native:text font="display" class="text-theme-on-surface text-lg">Stop</native:text>
+                        </native:pressable>
+                    @endif
+
+                    @if ($notice)
+                        <native:text class="text-theme-on-surface text-center">{{ $notice }}</native:text>
+                    @endif
+                </native:column>
+            @else
             <native:column class="w-full items-center gap-3 py-2">
                 <native:text font="mono" class="text-xs uppercase tracking-widest text-theme-secondary">{{ $phaseLabel }}</native:text>
 
@@ -160,6 +217,28 @@
                     @endforelse
                 </native:column>
             </native:scroll-view>
+            @endif
         </native:column>
+
+        <native:bottom-nav>
+            <native:bottom-nav-item
+                id="record"
+                label="Record"
+                icon="mic"
+                :active="$tab === 'record'"
+                :ios-icon="Ios::Mic"
+                :android-icon="Android::Mic"
+                @tap="showRecord"
+            />
+            <native:bottom-nav-item
+                id="ask"
+                label="Ask"
+                icon="question_answer"
+                :active="$tab === 'ask'"
+                :ios-icon="Ios::QuestionmarkBubble"
+                :android-icon="Android::QuestionAnswer"
+                @tap="showAsk"
+            />
+        </native:bottom-nav>
     @endif
 </native:column>

@@ -27,4 +27,11 @@ class TranscriptionServer
 
         return $base === null ? null : $base.'/api/v1/memos';
     }
+
+    public static function answersUrl(): ?string
+    {
+        $base = self::baseUrl();
+
+        return $base === null ? null : $base.'/api/v1/answers';
+    }
 }

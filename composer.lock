@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "da869ec4d854ff722904337e23538b31",
+    "content-hash": "6625b7610e8538b912d7bea8f26886df",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -4196,6 +4196,42 @@
                 }
             ],
             "time": "2026-09-28T07:16:50+00:00"
+        },
+        {
+            "name": "stable-mixer/speech",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "plugins/speech",
+                "reference": "40f3919b05b250c230fe6d1a9ac4a370bb72ad36"
+            },
+            "require": {
+                "nativephp/mobile": "^3.0 || ^4.0",
+                "php": "^8.3"
+            },
+            "type": "nativephp-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "StableMixer\\Speech\\SpeechServiceProvider"
+                    ]
+                },
+                "nativephp": {
+                    "manifest": "nativephp.json"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "StableMixer\\Speech\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "On-device text to speech for Stable Mixer.",
+            "transport-options": {
+                "relative": true
+            }
         },
         {
             "name": "symfony/clock",

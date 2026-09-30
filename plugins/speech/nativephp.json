@@ -1,0 +1,23 @@
+{
+    "namespace": "Speech",
+    "bridge_functions": [
+        {
+            "name": "Speech.Speak",
+            "android": "com.stablemixer.speech.SpeechFunctions.Speak",
+            "ios": "SpeechFunctions.Speak",
+            "description": "Speak text with the device voice"
+        },
+        {
+            "name": "Speech.Stop",
+            "android": "com.stablemixer.speech.SpeechFunctions.Stop",
+            "ios": "SpeechFunctions.Stop",
+            "description": "Stop speaking"
+        }
+    ],
+    "android": {
+        "min_version": 29
+    },
+    "ios": {
+        "min_version": "18.0"
+    }
+}

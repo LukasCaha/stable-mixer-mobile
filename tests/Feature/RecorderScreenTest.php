@@ -75,7 +75,7 @@ class RecorderScreenTest extends TestCase
         $screen = Native::test(Recorder::class)
             ->set('typedCode', 'ABCD1234')
             ->tap('Save code')
-            ->tap('Record')
+            ->tap('record')
             ->assertSet('phase', 'recording');
 
         Native::fakeBridge()->assertCalled('Microphone.Start', function (array $params) use ($screen) {
@@ -208,6 +208,83 @@ class RecorderScreenTest extends TestCase
 
         $this->assertSame('ZXCV9876', Setting::tenant());
         $this->assertSame('Old Barn', Setting::stableName());
+    }
+
+    public function test_the_dock_opens_ask_and_the_ask_button_records(): void
+    {
+        $this->fakeStableLookup();
+
+        $screen = Native::test(Recorder::class)
+            ->assertDontSee('Ask')
+            ->set('typedCode', 'ABCD1234')
+            ->tap('Save code')
+            ->assertSee('Ask')
+            ->tap('Ask')
+            ->assertSet('tab', 'ask')
+            ->assertSee('Nothing answered yet.')
+            ->tap('ask')
+            ->assertSet('phase', 'recording');
+
+        Native::fakeBridge()->assertCalled('Microphone.Start', function (array $params) use ($screen) {
+            return $params['id'] === $screen->get('activeId');
+        });
+    }
+
+    public function test_ask_lists_answers_and_plays_them(): void
+    {
+        Setting::putStable('ABCD1234', 'North Barn');
+
+        Http::fake([
+            'https://stable.test/api/v1/answers' => Http::response([
+                'pending' => false,
+                'answers' => [[
+                    'id' => 'answer-1',
+                    'question' => 'When was Willow shod?',
+                    'answer' => 'Last Tuesday.',
+                    'asked_at' => '2026-09-30T12:00:00Z',
+                ]],
+            ]),
+        ]);
+
+        Native::test(Recorder::class)
+            ->tap('Ask')
+            ->assertSee('When was Willow shod?')
+            ->assertSee('Last Tuesday.')
+            ->tap('Play')
+            ->assertSet('speakingId', 'answer-1')
+            ->assertSee('Stop')
+            ->tap('Stop')
+            ->assertSet('speakingId', null);
+
+        Native::fakeBridge()->assertCalled('Speech.Speak', function (array $params) {
+            return $params['text'] === 'Last Tuesday.';
+        });
+        Native::fakeBridge()->assertCalled('Speech.Stop');
+    }
+
+    public function test_ask_shows_waiting_while_a_memo_is_still_on_the_phone(): void
+    {
+        Setting::putStable('ABCD1234', 'North Barn');
+        Storage::disk('local')->put('recordings/55555555-5555-4555-8555-555555555555.m4a', 'audio');
+
+        $recording = new Recording;
+        $recording->id = '55555555-5555-4555-8555-555555555555';
+        $recording->path = 'recordings/55555555-5555-4555-8555-555555555555.m4a';
+        $recording->mime = 'audio/m4a';
+        $recording->status = Recording::Local;
+        $recording->save();
+
+        Http::fake([
+            'https://stable.test/api/v1/answers' => Http::response([
+                'pending' => true,
+                'answers' => [],
+            ]),
+        ]);
+
+        Native::test(Recorder::class)
+            ->tap('Ask')
+            ->assertSee('Waiting for an answer')
+            ->assertDontSee('Nothing answered yet.');
     }
 
     private function fakeStableLookup(): void
